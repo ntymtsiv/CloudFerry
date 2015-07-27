@@ -8,7 +8,8 @@ class FilteringUtils:
         # TODO:
         #  Using relative paths is a bad practice, unfortunately this is the
         #  only way at this moment.
-        #  Should be fixed by implementing proper package module for Cloud Ferry.
+        #  Should be fixed by implementing proper package module for
+        #  Cloud Ferry.
         self.main_folder = os.path.dirname(os.path.dirname(os.getcwd()))
 
     def load_file(self):
@@ -42,3 +43,22 @@ class FilteringUtils:
                     index = src_data_list.index(img)
                     src_data_list.pop(index)
         return [src_data_list, popped_img_list]
+
+    def get_resource_names(self, obj, cfg):
+        if obj == 'routers':
+            return [i['router']['name'] for i in cfg]
+        else:
+            return [i['name'] for i in cfg]
+
+    def get_resources_from_config(self, res):
+        if res == 'security_groups':
+            return [sg for i in config.tenants if 'security_groups' in i
+                    for sg in i['security_groups']]
+        elif res == 'servers':
+            cfg = getattr(config, 'vms')
+            [cfg.extend(i['vms']) for i in config.tenants if 'vms' in i]
+            return cfg
+        elif res == 'volumes':
+            res = 'cinder_volumes'
+
+        return getattr(config, res)
