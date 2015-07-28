@@ -12,6 +12,13 @@ CINDER_CLIENT_VERSION = real_env_conf.CINDER_CLIENT_VERSION
 
 
 class Prerequisites(old.Prerequisites):
+
+    def __init__(self, cloud_prefix='SRC'):
+        super(Prerequisites, self).__init__(cloud_prefix='SRC')
+        self.switch_user(user=real_env_conf.users[0]['name'],
+                         password=real_env_conf.users[0]['password'],
+                         tenant=real_env_conf.users[0]['tenant'])
+
     @staticmethod
     def update_vm_status():
         src_cloud = Prerequisites(cloud_prefix='SRC')
@@ -27,12 +34,12 @@ class Prerequisites(old.Prerequisites):
                     self.switch_user(user=user['name'], password=user['password'],
                                      tenant=user['tenant'])
                     self.novaclient.keypairs.create(**keypair)
-            self.switch_user(user=self.username, password=self.password,
-                             tenant=self.tenant)
+
         except Exception as e:
             print "Keypair failed to create:\n %s" % (repr(e))
 
     def create_vms(self):
+
         for vm in real_env_conf.vms:
             vm['image'] = self.get_image_id(vm['image'])
             vm['flavor'] = self.get_flavor_id(vm['flavor'])
@@ -60,8 +67,7 @@ class Prerequisites(old.Prerequisites):
                 time.sleep(5)
                 src_vms_2 = self.update_vm_status()
                 vm_addresses = src_vms_2[index]['addresses'][net_name]
-        self.switch_user(user=self.username, password=self.password,
-                         tenant=self.tenant)
+
 
     def create_networks(self, network_list, subnet_list):
         for network, subnet in zip(network_list, subnet_list):
@@ -95,20 +101,25 @@ class Prerequisites(old.Prerequisites):
                     volume_id=vlm.id,
                     device=volume['device'])
             self.wait_for_volume(volume['name'])
-            vms = self.update_vm_status()
-            inst_name = None
-            for vol in real_env_conf.cinder_volumes:
-                if 'server_to_attach' in vol.keys():
-                    inst_name = vol['server_to_attach']
-            for vm in vms:
-                if vm['name'] == inst_name:
-                    index = vms.index(vm)
-                    while vms[index]['status'] != 'ACTIVE':
-                        time.sleep(5)
-                        vms = self.update_vm_status()
+            # vms = self.update_vm_status()
+            # inst_name = None
+            # for vol in real_env_conf.cinder_volumes:
+            #     if 'server_to_attach' in vol.keys():
+            #         inst_name = vol['server_to_attach']
+            # for vm in vms:
+            #     if vm['name'] == inst_name:
+            #         index = vms.index(vm)
+            #         for i in range(100):
+            #             if vms[index]['status'] != 'ACTIVE':
+            #                 break
+            #             time.sleep(5)
+            #             vms = self.update_vm_status()
 
     def create_cinder_objects(self):
         self.create_cinder_volumes(real_env_conf.cinder_volumes)
+        real_env_conf.cinder_snapshots[0]['volume_id'] = self.get_volume_id(
+            real_env_conf.cinder_snapshots[0]['volume_id'])
+
         self.create_cinder_snapshots(real_env_conf.cinder_snapshots)
         self.cinderclient.volume_snapshots.list()
 

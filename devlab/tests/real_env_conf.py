@@ -30,6 +30,9 @@ keypairs = [
         'SHym3kZtZPSTgT6GIGoWA1+QHlhx5kiMVEN+YRZF vagrant'}
 ]
 
+# Images that should have few specific members:
+img_to_add_members = ['image3', 'image4']
+
 # Images to create/delete
 images = [
     {'name': 'image1', 'copy_from': 'http://download.cirros-cloud.net/0.3.3/ci'

@@ -20,7 +20,7 @@ NEUTRON_CLIENT_VERSION = config.NEUTRON_CLIENT_VERSION
 CINDER_CLIENT_VERSION = config.CINDER_CLIENT_VERSION
 
 
-class Prerequisites():
+class Prerequisites(object):
     def __init__(self, cloud_prefix='SRC'):
         self.filtering_utils = FilteringUtils()
         self.username = os.environ['%s_OS_USERNAME' % cloud_prefix]
