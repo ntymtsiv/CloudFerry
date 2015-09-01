@@ -390,3 +390,35 @@ class ResourceMigrationTests(functional_test.FunctionalTest):
                       "{fips}".format(num=len(missing_fips),
                       fips=pprint.pformat(missing_fips)))
 
+    def test_router_ips_not_overlapped(self):
+        def get_routers_gateway_info(router_list, client):
+            routers = [r for r in router_list if r['external_gateway_info']]
+            for router in routers:
+                router_ports = client.list_ports(
+                    device_id=router['id'])
+                ports = [port for port in router_ports['ports']
+                         if port['device_owner'] == 'network:router_gateway']
+                for p in ports:
+                    subnet_cidr = client.show_subnet(
+                        p['fixed_ips'][0]['subnet_id'])['subnet']['cidr']
+                    ip_address = p['fixed_ips'][0]['ip_address']
+                    router['gw_info'] = {subnet_cidr: ip_address}
+            return routers
+        src_router_list = self.filter_resources('routers')
+        src_routers = get_routers_gateway_info(src_router_list['routers'],
+                                               self.src_cloud.neutronclient)
+
+        dst_router_list = self.dst_cloud.neutronclient.list_routers()
+        dst_routers = get_routers_gateway_info(dst_router_list['routers'],
+                                               self.dst_cloud.neutronclient)
+        for src_r in src_routers:
+            for dst_r in dst_routers:
+                if src_r['name'] != dst_r['name']:
+                    continue
+                for cidr in src_r['gw_info']:
+                    if src_r['gw_info'][cidr] != dst_r['gw_info'][cidr]:
+                        continue
+                    msg = 'Router with name {name} has the same external ' \
+                          'gateway ip address on src and on dst {ip}'
+                    self.fail(msg.format(name=src_r['name'],
+                                         ip=src_r['gw_info'][cidr]))
