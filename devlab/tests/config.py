@@ -22,9 +22,13 @@ users = [
         [{'name': 'tenant1', 'role': '_member_'}]}
 ]
 
+user_tenant_roles = [
+    {'user4': [{'tenant': 'tenant2', 'role': 'SomeRole'}]}
+]
+
 # Roles to create/delete
 roles = [
-    {'name': 'SomeRole'}
+    {'name': 'SomeRole'}, {'name': 'SecondRole'}
 ]
 
 # Tenants to create/delete
