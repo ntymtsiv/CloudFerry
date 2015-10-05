@@ -50,10 +50,15 @@ class FunctionalTest(unittest.TestCase):
     # 'name' parameter in it's detail.
     # Implimentation of Subnet filtering for no name subnets is still needed.
     def filter_subnets(self):
-        subnets = [i['name'] for i in config.subnets]
-        for i in config.tenants:
-            if 'subnets' in i:
-                for subnet in i['subnets']:
+        subnets = [i['name'] for net in config.networks if net.get('subnets')
+                   for i in net['subnets']]
+        for tenant in config.tenants:
+            if 'networks' not in tenant:
+                continue
+            for network in tenant['networks']:
+                if 'subnets' not in network:
+                    continue
+                for subnet in network['subnets']:
                     subnets.append(subnet['name'])
         return self._get_neutron_resources('subnets', subnets)
 
