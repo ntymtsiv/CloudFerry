@@ -19,6 +19,9 @@ from filtering_utils import FilteringUtils
 
 TIMEOUT = 600
 VM_SPAWNING_LIMIT = 5
+OPENSTACK_RELEASES = {'192.168.1.2': 'grizzly',
+                      '192.168.1.3': 'icehouse',
+                      '192.168.1.8': 'juno'}
 
 
 def retry_until_resources_created(resource_name):
@@ -76,6 +79,13 @@ class Prerequisites(object):
                                           self.tenant, self.auth_url)
         # will be filled during create all networking step
         self.ext_net_id = None
+        self.openstack_release = self._get_openstack_release()
+
+    def _get_openstack_release(self):
+        for release in OPENSTACK_RELEASES:
+            if release in self.auth_url:
+                return OPENSTACK_RELEASES[release]
+        raise RuntimeError('Unknown OpenStack release')
 
     def get_tenant_id(self, tenant_name):
         tenants = self.keystoneclient.tenants.list()
@@ -307,7 +317,7 @@ class Prerequisites(object):
         for flavor in self.config.flavors:
             self.novaclient.flavors.create(**flavor)
 
-    def create_vms(self):
+    def _get_parameters_for_vm_creating(self, vm):
         def get_vm_nics(_vm):
             if 'nics' in _vm:
                 for _nic in _vm['nics']:
@@ -319,12 +329,14 @@ class Prerequisites(object):
                     if not net['router:external'] and net['tenant_id'] == _t]
             return nics
 
-        def get_parameters_for_vm_creating(_vm):
-            return {'image': self.get_image_id(_vm['image']),
-                    'flavor': self.get_flavor_id(_vm['flavor']),
-                    'nics': get_vm_nics(_vm),
-                    'name': _vm['name']
-                    }
+        image_id = self.get_image_id(vm['image']) if vm.get('image') else ''
+        return {'image': image_id,
+                'flavor': self.get_flavor_id(vm['flavor']),
+                'nics': get_vm_nics(vm),
+                'name': vm['name']
+                }
+
+    def create_vms(self):
 
         def wait_vm_nic_created(vm_id):
             for i in range(TIMEOUT):
@@ -360,7 +372,7 @@ class Prerequisites(object):
             for vm in vm_list:
                 wait_for_vm_creating()
                 _vm = self.novaclient.servers.create(
-                    **get_parameters_for_vm_creating(vm))
+                    **self._get_parameters_for_vm_creating(vm))
                 vm_ids.append(_vm.id)
                 if not vm.get('fip'):
                     continue
@@ -515,6 +527,13 @@ class Prerequisites(object):
                     raise RuntimeError(msg.format(volume_id))
             return volume_ids
 
+        def get_params_for_volume_creating(_volume):
+            params = ['display_name', 'size', 'imageRef']
+            if 'image' in _volume:
+                _volume['imageRef'] = self.get_image_id(_volume['image'])
+            return {param: _volume[param] for param in params
+                    if param in _volume}
+
         vlm_ids = []
         for volume in volumes_list:
             if 'user' in volume:
@@ -522,8 +541,8 @@ class Prerequisites(object):
                         if u['name'] == volume['user']][0]
                 self.switch_user(user=user['name'], password=user['password'],
                                  tenant=user['tenant'])
-            vlm = self.cinderclient.volumes.create(display_name=volume['name'],
-                                                   size=volume['size'])
+            vlm = self.cinderclient.volumes.create(
+                **get_params_for_volume_creating(volume))
             vlm_ids.append(vlm.id)
         self.switch_user(user=self.username, password=self.password,
                          tenant=self.tenant)
@@ -532,7 +551,7 @@ class Prerequisites(object):
         for volume in volumes_list:
             if 'server_to_attach' not in volume:
                 continue
-            vlm_id = self.get_volume_id(volume['name'])
+            vlm_id = self.get_volume_id(volume['display_name'])
             self.novaclient.volumes.create_server_volume(
                 server_id=self.get_vm_id(volume['server_to_attach']),
                 volume_id=vlm_id,
@@ -637,6 +656,22 @@ class Prerequisites(object):
                     tenant_name=t['name'], description=t['description'],
                     enabled=t['enabled'])
 
+    def create_volumes_from_images(self):
+        self.create_cinder_volumes(self.config.cinder_volumes_from_images)
+
+    def boot_vms_from_volumes(self):
+        for vm in self.config.vms_from_volumes:
+            params = self._get_parameters_for_vm_creating(vm)
+            params['block_device_mapping_v2'] = []
+            params['block_device_mapping_v2'].append(
+                {'source_type': 'volume',
+                 'delete_on_termination': False,
+                 'boot_index': 0,
+                 'uuid': self.get_volume_id(vm['volume']),
+                 'destination_type': 'volume'}
+            )
+            self.novaclient.servers.create(**params)
+
     def run_preparation_scenario(self):
         print('>>> Creating tenants:')
         self.create_tenants()
@@ -656,6 +691,11 @@ class Prerequisites(object):
         self.create_all_networking()
         print('>>> Creating vms:')
         self.create_vms()
+        if self.openstack_release in ['icehouse', 'juno']:
+            print('>>> Create bootable volume from image')
+            self.create_volumes_from_images()
+            print('>>> Boot vm from volume')
+            self.boot_vms_from_volumes()
         print('>>> Updating filtering:')
         self.update_filtering_file()
         print('>>> Creating vm snapshots:')
@@ -732,6 +772,7 @@ class Prerequisites(object):
         vms = self.config.vms
         vms += itertools.chain(*[tenant['vms'] for tenant
                                  in self.config.tenants if tenant.get('vms')])
+        [vms.append(vm) for vm in self.config.vms_from_volumes]
         for vm in vms:
             try:
                 self.novaclient.servers.delete(self.get_vm_id(vm['name']))
@@ -836,13 +877,15 @@ class Prerequisites(object):
         volumes += itertools.chain(*[tenant['cinder_volumes'] for tenant
                                      in self.config.tenants if 'cinder_volumes'
                                      in tenant])
+        for volume in self.config.cinder_volumes_from_images:
+            volumes.append(volume)
         for volume in volumes:
             try:
                 self.cinderclient.volumes.delete(
-                    self.get_volume_id(volume['name']))
+                    self.get_volume_id(volume['display_name']))
             except Exception as e:
-                print "Volume %s failed to delete: %s" % (volume['name'],
-                                                          repr(e))
+                print "Volume %s failed to delete: %s" % (
+                    volume['display_name'], repr(e))
 
 
 if __name__ == '__main__':
