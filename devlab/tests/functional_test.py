@@ -17,8 +17,10 @@ import logging
 import sys
 import os
 import unittest
-from generate_load import Prerequisites
+
 import utils
+
+from generate_load import Prerequisites
 
 
 def get_cf_root_folder():
