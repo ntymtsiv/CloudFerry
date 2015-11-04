@@ -624,6 +624,11 @@ class Prerequisites(BasePrerequisites):
         for router in self.config.routers:
             self.neutronclient.create_router(router)
 
+    def create_unassociated_fips(self, fips_count, net_id):
+        for i in range(fips_count):
+            self.neutronclient.create_floatingip(
+                {"floatingip": {"floating_network_id": net_id}})
+
     @clean_if_exists
     def create_all_networking(self):
         self.create_routers()
@@ -640,9 +645,8 @@ class Prerequisites(BasePrerequisites):
                 self.create_networks(tenant['networks'])
             if not tenant.get('unassociated_fip'):
                 continue
-            for i in range(tenant['unassociated_fip']):
-                self.neutronclient.create_floatingip(
-                    {"floatingip": {"floating_network_id": self.ext_net_id}})
+            self.create_unassociated_fips(tenant['unassociated_fip'],
+                                          self.ext_net_id)
         self.switch_user(user=self.username, password=self.password,
                          tenant=self.tenant)
 
@@ -879,6 +883,24 @@ class Prerequisites(BasePrerequisites):
             )
             self.novaclient.servers.create(**params)
 
+    def create_unassociated_fips_on_dst(self):
+        """ Method allocates floating ips on destination cloud. External
+            network, from which fips are allocated, should be specified in the
+            'dst_networks' variable in the config.py ('real_network' parameter
+             should be True)
+        """
+        for network in self.config.dst_networks:
+            if network.get('real_network'):
+                dst_ext_net_id = self.dst_cloud.get_net_id(network['name'])
+                break
+        else:
+            msg = """Please specify external network on the dest, from which
+                     fips should be allocated (parameter "real_network" should
+                     be True"""
+            raise RuntimeError(msg)
+        self.dst_cloud.create_unassociated_fips(
+            self.config.dst_unassociated_fip, dst_ext_net_id)
+
     def run_preparation_scenario(self):
         print('>>> Creating tenants:')
         self.create_tenants()
@@ -929,6 +951,11 @@ class Prerequisites(BasePrerequisites):
         self.delete_tenants()
         print('>>> Create tenant on dst, without security group')
         self.create_tenant_wo_sec_group_on_dst()
+        print('>>> Creating networks on dst:')
+        self.dst_cloud.create_networks(self.config.dst_networks)
+        # TODO uncomment when multiple external networks will work
+        # print('>>> Allocating floating ips on dst:')
+        # self.create_unassociated_fips_on_dst()
         print('>>> Create role on dst')
         self.create_user_on_dst()
 
@@ -1018,6 +1045,7 @@ class CleanEnv(BasePrerequisites):
         nets += itertools.chain(*[tenant['networks'] for tenant
                                   in self.config.tenants
                                   if tenant.get('networks')])
+        nets.extend(self.config.dst_networks)
         nets_names = [net['name'] for net in nets]
         for network in self.neutronclient.list_networks()['networks']:
             if network['name'] not in nets_names:

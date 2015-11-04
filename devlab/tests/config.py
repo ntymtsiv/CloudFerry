@@ -168,6 +168,7 @@ networks = [
      },
     {'name': 'shared_net', 'admin_state_up': True, 'shared': True,
      'router:external': True, 'real_network': True,
+     'provider:segmentation_id': 25, 'provider:network_type': 'gre',
      'subnets': [
          {'cidr': '192.168.1.0/24', 'ip_version': 4, 'name': 'external_subnet',
           'routers_to_connect': ['ext_router'], 'allocation_pools': [
@@ -175,6 +176,23 @@ networks = [
           }]
      }
 ]
+
+dst_networks = [
+    {'name': 'dst_private_net', 'admin_state_up': True,
+     'provider:network_type': 'gre', 'provider:segmentation_id': 1000,
+     'subnets': [
+         {'cidr': '22.2.2.0/24', 'ip_version': 4, 'name': 'dst_subnet'}]
+     },
+    {'name': 'dst_shared_net', 'admin_state_up': True, 'shared': True,
+     'provider:network_type': 'vxlan', 'provider:segmentation_id': 25,
+     # TODO change 'router:external' and 'real_network' when multiple external
+     # networks will work
+     'router:external': False, 'real_network': False,
+     'subnets': [{'cidr': '192.168.110.0/24', 'ip_version': 4,
+                  'name': 'dst_external_subnet'}]}
+]
+
+dst_unassociated_fip = 4
 
 # VM's to create/delete
 vms = [
