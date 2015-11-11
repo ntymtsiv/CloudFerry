@@ -53,7 +53,7 @@ def clean_if_exists(func):
 def retry_until_resources_created(resource_name):
     def actual_decorator(func):
         def wrapper(_list):
-            for i in range(TIMEOUT):
+            for _ in range(TIMEOUT):
                 _list = func(_list)
                 if _list:
                     time.sleep(1)
@@ -487,7 +487,7 @@ class Prerequisites(BasePrerequisites):
                 This request was rate-limited. (HTTP 413)'. To handle this we
                 set limit for vm spawning.
             """
-            for i in range(TIMEOUT):
+            for _ in range(TIMEOUT):
                 all_vms = self.novaclient.servers.list(
                     search_opts={'all_tenants': 1})
                 spawning_vms = [vm.id for vm in all_vms
@@ -642,7 +642,7 @@ class Prerequisites(BasePrerequisites):
                 self.create_networks(tenant['networks'])
             if not tenant.get('unassociated_fip'):
                 continue
-            for i in range(tenant['unassociated_fip']):
+            for _ in range(tenant['unassociated_fip']):
                 self.neutronclient.create_floatingip(
                     {"floatingip": {"floating_network_id": self.ext_net_id}})
         self.switch_user(user=self.username, password=self.password,
@@ -768,7 +768,7 @@ class Prerequisites(BasePrerequisites):
     def generate_vm_state_list(self):
         data = {}
         for vm in self.novaclient.servers.list(search_opts={'all_tenants': 1}):
-            for i in range(TIMEOUT):
+            for _ in range(TIMEOUT):
                 _vm = self.novaclient.servers.get(vm.id)
                 if _vm.status != u'RESIZE':
                     break
@@ -788,7 +788,7 @@ class Prerequisites(BasePrerequisites):
         try:
             self.novaclient.flavors.delete(
                 self.get_flavor_id(flavor))
-        except Exception as e:
+        except nv_exceptions.ClientException as e:
             print "Flavor %s failed to delete: %s" % (flavor, repr(e))
 
     def update_network_quotas(self):
@@ -940,7 +940,7 @@ class CleanEnv(BasePrerequisites):
     def clean_vms(self):
         def wait_until_vms_all_deleted():
             timeout = 120
-            for i in range(timeout):
+            for _ in range(timeout):
                 servers = self.novaclient.servers.list(
                     search_opts={'all_tenants': 1})
                 for server in servers:
@@ -958,7 +958,7 @@ class CleanEnv(BasePrerequisites):
         vms = self.config.vms
         vms += itertools.chain(*[tenant['vms'] for tenant
                                  in self.config.tenants if tenant.get('vms')])
-        [vms.append(vm) for vm in self.config.vms_from_volumes]
+        vms.extend(self.config.vms_from_volumes)
         vms_names = [vm['name'] for vm in vms]
         vms = self.novaclient.servers.list(search_opts={'all_tenants': 1})
         for vm in vms:
@@ -1068,7 +1068,7 @@ class CleanEnv(BasePrerequisites):
         for ip in floatingips:
             try:
                 self.neutronclient.delete_floatingip(ip['id'])
-            except Exception as e:
+            except nt_exceptions.NeutronClientException as e:
                 print "Ip %s failed to delete: %s" % (
                     ip['floating_ip_address'], repr(e))
 
@@ -1101,9 +1101,8 @@ class CleanEnv(BasePrerequisites):
             except ks_exceptions.Unauthorized:
                 return
 
-            keypairs = [k.id for k in self.novaclient.keypairs.list()]
-            if keypairs:
-                map(self.novaclient.keypairs.delete, keypairs)
+            for k in self.novaclient.keypairs.list():
+                self.novaclient.keypairs.delete(k.id)
             self.switch_user(user=self.username, password=self.password,
                              tenant=self.tenant)
 
@@ -1169,9 +1168,9 @@ if __name__ == '__main__':
                                         'self.config.ini', action='store_true')
     parser.add_argument('--env', default='SRC',
                         help='choose cloud: SRC or DST')
-    args = parser.parse_args()
-    preqs = Prerequisites(config=conf, cloud_prefix=args.env)
-    if args.clean:
+    run_args = parser.parse_args()
+    preqs = Prerequisites(config=conf, cloud_prefix=run_args.env)
+    if run_args.clean:
         preqs.clean_tools.clean_objects()
     else:
         preqs.run_preparation_scenario()

@@ -44,6 +44,10 @@ class GroupProcedureVerification(functional_test.FunctionalTest):
                                               self.conf_path),
                                  src_ip, dst_ip)
         os.system(cmd)
+        self.src_vms = None
+        self.new_file_name = None
+        self.post_conf_dict = {}
+        self.pre_conf_dict = {}
 
     def tearDown(self):
         """
@@ -54,22 +58,19 @@ class GroupProcedureVerification(functional_test.FunctionalTest):
         cmd_2 = 'rm {}'.format(os.path.join(self.main_folder,
                                             'vm_groups.yaml'))
         for cmd in [cmd_1, cmd_2]:
-            try:
-                os.system(cmd)
-            except Exception as e:
-                print 'Was unable to delete testing files, error output:' \
-                      '\n{}'.format(e)
+            resp = os.system(cmd)
+            if resp:
+                msg = 'Was unable to delete testing files, error code: %s'
+                print(msg % resp)
 
     def _get_ip_from_url(self, url):
-        ip_regexp = '.+(\d{3}\.\d{1,3}\.\d{1,3}\.\d{1,3}).+'
+        ip_regexp = r'.+(\d{3}\.\d{1,3}\.\d{1,3}\.\d{1,3}).+'
         return re.match(ip_regexp, url).group(1)
 
     def _prepare_files(self, grouping_by):
         """
         Method for generation of test/configuration files.
         """
-        self.post_conf_dict = {}
-        self.pre_conf_dict = {}
         main_folder = self.main_folder
 
         file_path = 'devlab/tests/groups_example.yaml'

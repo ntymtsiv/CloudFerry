@@ -130,7 +130,9 @@ class FunctionalTest(unittest.TestCase):
 
     def filter_vms(self):
         vms = config.vms
-        [vms.extend(i['vms']) for i in config.tenants if 'vms' in i]
+        t_vms = [vm for _vms in config.tenants if 'vms' in _vms
+                 for vm in _vms['vms']]
+        vms.extend(t_vms)
         vms.extend(config.vms_from_volumes)
         vms_names = [vm['name'] for vm in vms]
         opts = {'search_opts': {'all_tenants': 1}}
@@ -154,14 +156,15 @@ class FunctionalTest(unittest.TestCase):
         for tenant in config.tenants:
             if not tenant.get('images'):
                 continue
-            [images.append(i['name']) for i in tenant['images']]
+            images.extend([i['name'] for i in tenant['images']])
         return [i for i in self.src_cloud.glanceclient.images.list()
                 if i.name in images]
 
     def filter_volumes(self):
         volumes = config.cinder_volumes
-        [volumes.extend(i['cinder_volumes']) for i in config.tenants
-         if 'cinder_volumes' in i]
+        t_volumes = [v for i in config.tenants if 'cinder_volumes' in i
+                     for v in i['cinder_volumes']]
+        volumes.extend(t_volumes)
         volumes.extend(config.cinder_volumes_from_images)
         volumes_names = [volume['display_name'] for volume in volumes]
         opts = {'search_opts': {'all_tenants': 1}}
@@ -184,5 +187,6 @@ class FunctionalTest(unittest.TestCase):
 
     def get_vms_with_fip_associated(self):
         vms = config.vms
-        [vms.extend(i['vms']) for i in config.tenants if 'vms' in i]
+        vms.extend([vm for i in config.tenants if 'vms' in i
+                    for vm in i['vms']])
         return [vm['name'] for vm in vms if vm.get('fip')]
