@@ -1129,7 +1129,25 @@ class Prerequisites(BasePrerequisites):
         print('>>> Creating networking:')
         self.create_all_networking()
         print('>>> Creating vms:')
-        self.create_vms()
+        try:
+            self.create_vms()
+        except Exception as e:
+            cmds = ['cat /var/log/nova/nova-compute.log | tail -n 50',
+                    'cat /var/log/nova/nova-api.log | tail -n 50']
+            if self.openstack_release == 'grizzly':
+                cmds.append('cat /var/log/quantum/server.log | tail -n 50')
+            else:
+                cmds.append('cat /var/log/neutron/server.log | tail -n 50')
+            for cmd in cmds:
+                output = self.migration_utils.execute_command_on_vm(
+                    self.get_vagrant_vm_ip(), cmd, username='root')
+                print(cmd)
+                print(output)
+            print('Neutron Agents statuses:')
+            print(self.neutronclient.list_agents())
+            for agent in self.neutronclient.list_agents()['agents']:
+                print('%s, %s' % (agent['binary'], agent['alive']))
+            raise e
         if self.openstack_release in ['icehouse', 'juno']:
             print('>>> Create bootable volume from image')
             self.create_volumes_from_images()
