@@ -21,11 +21,13 @@ from neutronclient.v2_0 import client as neutron
 from cinderclient.v1 import client as cinder
 
 from test_exceptions import NotFound
+import check_services
 import utils
 
 OPENSTACK_RELEASES = {'192.168.1.2': 'grizzly',
                       '192.168.1.3': 'icehouse',
                       '192.168.1.8': 'juno'}
+
 
 class BasePrerequisites(object):
 
@@ -74,6 +76,7 @@ class BasePrerequisites(object):
         self.openstack_release = self._get_openstack_release()
         self.server_groups_supported = self.openstack_release in ['icehouse',
                                                                   'juno']
+        check_services.CheckOpenstackServices(self).start()
 
     def _get_openstack_release(self):
         for release in OPENSTACK_RELEASES:

@@ -22,3 +22,9 @@ class ConfFileError(RuntimeError):
     """Raise this exception in case when config file parameter
        missed or config file format is incorrect
     """
+
+
+class AbortGenerateLoadError(RuntimeError):
+    """Non-recoverable exception which must be used in cases where generate
+       load process MUST be aborted
+    """
