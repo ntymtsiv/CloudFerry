@@ -977,7 +977,13 @@ class Prerequisites(BasePrerequisites):
             print('>>> Boot vm from volume')
             self.boot_vms_from_volumes()
         print('>>> Creating vms:')
-        self.create_vms()
+        try:
+            self.create_vms()
+        except Exception:
+            cmd = 'tail -n 100 /var/log/nova/nova-compute.log'
+            res = self.migration_utils.execute_command_on_vm(
+                self.get_vagrant_vm_ip(), cmd, username='root', password='')
+            print(res)
         print('>>> Breaking VMs:')
         self.break_vm()
         print('>>> Breaking Images:')
