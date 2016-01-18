@@ -979,19 +979,19 @@ class Prerequisites(BasePrerequisites):
         print('>>> Creating vms:')
         try:
             self.create_vms()
+            print('>>> Breaking VMs:')
+            self.break_vm()
+            print('>>> Breaking Images:')
+            self.break_image()
+            print('>>> Updating filtering:')
+            self.update_filtering_file()
+            print('>>> Creating vm snapshots:')
+            self.create_vm_snapshots()
         except Exception:
             cmd = 'tail -n 100 /var/log/nova/nova-compute.log'
             res = self.migration_utils.execute_command_on_vm(
                 self.get_vagrant_vm_ip(), cmd, username='root', password='')
             print(res)
-        print('>>> Breaking VMs:')
-        self.break_vm()
-        print('>>> Breaking Images:')
-        self.break_image()
-        print('>>> Updating filtering:')
-        self.update_filtering_file()
-        print('>>> Creating vm snapshots:')
-        self.create_vm_snapshots()
         print('>>> Creating security groups:')
         self.create_security_groups()
         print('>>> Creating cinder objects:')
