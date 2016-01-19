@@ -295,7 +295,7 @@ class Prerequisites(BasePrerequisites):
     def create_flavors(self):
         for flavor in self.config.flavors:
             fl = self.novaclient.flavors.create(**flavor)
-            if flavor.get('is_public') == False:
+            if flavor.get('is_public') is False:
                 self.novaclient.flavor_access.add_tenant_access(
                     flavor=fl.id,
                     tenant=self.get_tenant_id(self.tenant))
@@ -303,7 +303,7 @@ class Prerequisites(BasePrerequisites):
             if tenant.get('flavors'):
                 for flavor in tenant['flavors']:
                     fl = self.novaclient.flavors.create(**flavor)
-                    if flavor.get('is_public') == False:
+                    if flavor.get('is_public') is False:
                         self.novaclient.flavor_access.add_tenant_access(
                             flavor=fl.id,
                             tenant=self.get_tenant_id(tenant['name']))
