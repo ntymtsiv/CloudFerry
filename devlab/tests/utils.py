@@ -12,13 +12,15 @@
 # See the License for the specific language governing permissions and#
 # limitations under the License.
 
+import base
 import collections
 import os
 import yaml
 import config
 import time
+import test_exceptions
 
-from fabric.api import run, settings, sudo, hide
+from fabric.api import run, settings, sudo, hide, local
 from fabric.network import NetworkError
 from neutronclient.common.exceptions import NeutronClientException
 
@@ -123,6 +125,32 @@ class MigrationUtils(object):
 
     def __init__(self, conf):
         self.config = conf
+        self.start_ssh_agent()
+
+    def start_ssh_agent(self):
+        if self.config.local_rsa_key_path:
+            rsa_key_path = self.config.loca_rsa_key
+        else:
+            # check default path ~/.ssh/id_rsa and ~/.ssh/id_dsa
+            for key in ('.ssh/id_rsa', '.ssh/id_dsa'):
+                path_to_default_key = os.path.join(os.environ['HOME'], key)
+                if os.path.exists(path_to_default_key):
+                    rsa_key_path = path_to_default_key
+                    break
+            else:
+                msg = ('RSA key was not found. Please set path to rsa key in '
+                       'the config.py in variable "local_rsa_key_path"')
+                raise test_exceptions.AbortGenerateLoadError(msg)
+
+        with hide('everything'), settings(warn_only=True):
+            result = local('ssh-add -l', capture=True)
+            if result.succeeded:
+                if rsa_key_path not in result:
+                    local('ssh-add %s' % rsa_key_path)
+                return
+            cmd = 'eval `ssh-agent` && echo $SSH_AUTH_SOCK && ssh-add %s'
+            info_agent = local(cmd % rsa_key_path, capture=True).splitlines()
+            os.environ["SSH_AUTH_SOCK"] = info_agent[1]
 
     def execute_command_on_vm(self, ip_addr, cmd, username=None,
                               warn_only=False, password=None, key=None,
@@ -132,10 +160,12 @@ class MigrationUtils(object):
             username = self.config.username_for_ssh
         if password is None and key is None:
             password = self.config.password_for_ssh
+        no_agent = False if ip_addr in base.OPENSTACK_RELEASES else True
         with hide('everything'), settings(
                 host_string=ip_addr, user=username, password=password, key=key,
-                abort_on_prompts=True, connection_attempts=3,
-                disable_known_hosts=True, no_agent=True, warn_only=warn_only):
+                abort_on_prompts=False, connection_attempts=3,
+                disable_known_hosts=True, no_agent=no_agent,
+                warn_only=warn_only):
             try:
                 if use_sudo:
                     return sudo(cmd, shell=False)

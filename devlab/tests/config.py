@@ -596,4 +596,10 @@ rollback_params = {'data_file_names': {'PRE': 'data_before_migration.yaml',
                                   'Glance': ['images', 'members'],
                                   'Cinder': ['volume_snapshots', 'volumes',
                                              'quotas']}}
+
 """Parameters required for rollback verification procedure"""
+
+local_rsa_key_path = None
+""" Path to rsa key on comp, from which generate_load is started. Is used for
+access to the openstack VMs. If not specified, ~/.ssh/id_rsa and~/.ssh/id_dsa
+"""
