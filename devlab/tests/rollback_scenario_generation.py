@@ -24,13 +24,14 @@ import random
 
 import yaml
 
+import devlab.tests.config as config
 import devlab.tests.utils as utils
 
 
 class RollbackScenarioGeneration(object):
     def __init__(self):
         self.utils = utils.Utils()
-        self.file_path = 'devlab/tests/scenarios/cold_migrate.yaml'
+        self.file_path = config.path_to_scenario
         self.full_path = os.path.join(self.utils.main_folder, self.file_path)
         self.exception_task = {'fail_migration': True}
         self.steps_list = []

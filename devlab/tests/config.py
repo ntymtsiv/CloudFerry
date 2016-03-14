@@ -640,6 +640,11 @@ private_key = {
 
 dst_prv_key_path = '~/.ssh/id_rsa'
 
+"""Path to migration scenario. Is used for generating scenario in tests for
+rollbacks"""
+
+path_to_scenario = 'scenario/migrate.yaml'
+
 rollback_params = {'data_file_names': {'PRE': 'data_before_migration.yaml',
                                        'POST': 'data_after_migration.yaml'},
 
